@@ -186,14 +186,18 @@ function priceCheck(message) {
               bestTraderName = traderPrice.trader.name;
             }
           }
-          var fleaPrice = parseInt(item.avg24hPrice).toLocaleString() + "₽";
-          var traderVal = bestTraderPrice.toLocaleString() + "₽";
-          if (size > 1) {
+          if (item.avg24hPrice > 0) {
+            var fleaPrice = parseInt(item.avg24hPrice).toLocaleString() + "₽";
+            if (size > 1) {
               fleaPrice += "\r\n" + Math.round(parseInt(item.avg24hPrice) / size).toLocaleString() + "₽/slot";
-              traderVal += "\r\n" + Math.round(bestTraderPrice / size).toLocaleString() + "₽/slot"
+            }
+            embed.addField("Flea Price", fleaPrice, true);
           }
-          embed.addField("Flea Price", fleaPrice, true);
           if (bestTraderName) {
+            var traderVal = bestTraderPrice.toLocaleString() + "₽";
+            if (size > 1) {
+              traderVal += "\r\n" + Math.round(bestTraderPrice / size).toLocaleString() + "₽/slot"
+            }
             embed.addField(bestTraderName + " Value", traderVal, true);
           }
           for (const barterIndex in barters) {
@@ -220,6 +224,9 @@ function priceCheck(message) {
               if (c.rewardItems[0].count > 1) craftCost += ' ('+c.rewardItems[0].count+')';
               embed.addField(c.source + " Craft", craftCost, true);
             }
+          }
+          if (embed.fields.length == 0) {
+            embed.setDescription('No prices available.');
           }
           message.channel.send(embed)
             .then(function(sentmessage){
