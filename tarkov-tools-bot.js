@@ -38,7 +38,7 @@ discordClient.on('message', message => {
     } else if (message.content.toLowerCase().indexOf('!craft ') == 0) {
         craftSearch(message);
     }
-    if (message.author.id == config.adminId && message.channel.type == 'dm') {
+    if ((message.author.id == config.adminId || (config.adminId instanceof Array && config.adminId.includes(message.author.id))) && message.channel.type == 'dm') {
         if (message.content.toLowerCase().indexOf('!servers') == 0) {
             listServers(message);
         } else if (message.content.toLowerCase().indexOf('!leaveserver ') == 0) {
