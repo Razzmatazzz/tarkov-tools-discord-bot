@@ -1,0 +1,15 @@
+{
+  "name": "TarkovToolsBot",
+  "version": "1.0.0",
+  "description": "Discord bot",
+  "main": "tarkov-tools-bot.js",
+  "scripts": {
+    "start": "node tarkov-tools-bot.js"
+  },
+  "dependencies": {
+    "discord.js": "github:discordjs/discord.js#123713305ad5a6aa1e5205a53713494009740aef",
+    "jquery": "^3.6.0",
+    "xmlhttprequest": "^1.8.0"
+  },
+  "license": "GNU GPL v3"
+}

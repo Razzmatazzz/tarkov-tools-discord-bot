@@ -348,3 +348,7 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+#config file storing Discord api token, etc.
+config.json
+package-lock.json
