@@ -12,6 +12,10 @@ discordClient.on('ready', () => {
     console.log(`Logged in as ${discordClient.user.tag}!`);
 
     getCraftsBarters();
+
+    discordClient.user.setActivity('tarkov-tools.com', { type: 'PLAYING' })
+        .then(presence => { console.log('Activity set to Playing tarkov-tools.com') })
+        .catch(console.error);
 });
 
 discordClient.login(config.discordApiToken);
