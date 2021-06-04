@@ -2,10 +2,10 @@
 Discord bot that uses the Tarkov Tools API
 
 Requires a config.json file in the bot folder with the following format:
-{
+`{
 	"discordApiToken": "API TOKEN FOR YOUR DISCORD BOT GOES HERE",
 	"adminId": "18-DIGIT DISCORD ID FOR ADMIN USER GOES HERE"
-}
+}`
 
 The adminId field can also be an array of ID values.
 
