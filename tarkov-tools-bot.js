@@ -7,11 +7,13 @@ const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
 let barters = [];
 let crafts = [];
+let currencies = {'RUB': 1};
 
 discordClient.on('ready', () => {
     console.log(`Logged in as ${discordClient.user.tag}!`);
 
     getCraftsBarters();
+    getCurrencies();
 
     discordClient.user.setActivity('tarkov-tools.com', { type: 'PLAYING' })
         .then(presence => { console.log('Activity set to Playing tarkov-tools.com') })
@@ -160,7 +162,7 @@ const htmlSpecialChars = (string) => {
 
 const priceCheck = async (message) => {
     const itemname = message.content.replace('!price ', '');
-    const query = 'query { itemsByName(name: "' + itemname + '") { id name normalizedName shortName basePrice updated width height iconLink wikiLink imageLink link types avg24hPrice recoilModifier traderPrices { price trader { id name } } } }';
+    const query = 'query { itemsByName(name: "' + itemname + '") { id name normalizedName shortName basePrice updated width height iconLink wikiLink imageLink link types avg24hPrice recoilModifier traderPrices { price trader { id name } } buyFor { source price currency requirements { type value } } } }';
     try {
         const response = await ttRequest({ channel: message.channel, graphql: query });
         if (response.hasOwnProperty('data') && response.data.hasOwnProperty('itemsByName')) {
@@ -192,7 +194,14 @@ const priceCheck = async (message) => {
                         if (size > 1) {
                             fleaPrice += "\r\n" + Math.round(parseInt(item.avg24hPrice) / size).toLocaleString() + "₽/slot";
                         }
-                        embed.addField("Flea Price", fleaPrice, true);
+                        embed.addField("Flea Price (avg)", fleaPrice, true);
+                    }
+                    if (item.lastLowPrice > 0) {
+                        let fleaPrice = parseInt(item.lastLowPrice).toLocaleString() + "₽";
+                        if (size > 1) {
+                            fleaPrice += "\r\n" + Math.round(parseInt(item.avg24hPrice) / size).toLocaleString() + "₽/slot";
+                        }
+                        embed.addField("Flea Price (low)", fleaPrice, true);
                     }
                     if (bestTraderName) {
                         let traderVal = bestTraderPrice.toLocaleString() + "₽";
@@ -201,13 +210,41 @@ const priceCheck = async (message) => {
                         }
                         embed.addField(bestTraderName + " Value", traderVal, true);
                     }
+                    for (const offerindex in item.buyFor) {
+                        const offer = item.buyFor[offerindex];
+                        if (offer.source == 'fleaMarket') continue;
+                        let traderPrice = (parseInt(offer.price) * currencies[offer.currency]).toLocaleString() + "₽";
+                        let level = 1;
+                        let quest = '';
+                        for (const reqindex in offer.requirements) {
+                            const req = offer.requirements[reqindex];
+                            if (req.type == 'loyaltyLevel') {
+                                level = req.value;
+                            } else if (req.type == 'questCompleted') {
+                                quest = req.value;
+                            }
+                        }
+                        if (quest) {
+                            quest = ' +Task';
+                        }
+                        let trader = offer.source.charAt(0).toUpperCase() + offer.source.slice(1);
+                        embed.addField(`${trader} LL${level}${quest} Price`, traderPrice);
+                    }
                     for (const barterIndex in barters) {
                         const b = barters[barterIndex];
                         if (b.rewardItems[0].item.id == item.id) {
                             let barterCost = 0;
                             for (const reqIndex in b.requiredItems) {
-                                const reqItem = b.requiredItems[reqIndex];
-                                barterCost += reqItem.item.avg24hPrice * reqItem.count;
+                                const req = b.requiredItems[reqIndex];
+                                let itemCost = req.item.avg24hPrice;
+                                if (req.item.lastLowPrice > itemCost && req.item.lastLowPrice > 0) itemCost = req.item.lastLowPrice;
+                                for (const offerindex in req.item.buyFor) {
+                                    const offer = req.item.buyFor[offerindex];
+                                    if (offer.source == 'fleaMarket') continue;
+                                    let traderPrice = offer.price * currencies[offer.currency];
+                                    if (traderPrice < itemCost || itemCost == 0) itemCost = traderPrice;
+                                }
+                                barterCost += itemCost * req.count;
                             }
                             barterCost = Math.round(barterCost / b.rewardItems[0].count).toLocaleString() + "₽";
                             embed.addField(b.source + " Barter", barterCost, true);
@@ -218,8 +255,16 @@ const priceCheck = async (message) => {
                         if (c.rewardItems[0].item.id == item.id) {
                             let craftCost = 0;
                             for (const reqIndex in c.requiredItems) {
-                                const reqItem = c.requiredItems[reqIndex];
-                                craftCost += reqItem.item.avg24hPrice * reqItem.count;
+                                const req = c.requiredItems[reqIndex];
+                                let itemCost = req.item.avg24hPrice;
+                                if (req.item.lastLowPrice > itemCost && req.item.lastLowPrice > 0) itemCost = req.item.lastLowPrice;
+                                for (const offerindex in req.item.buyFor) {
+                                    const offer = req.item.buyFor[offerindex];
+                                    if (offer.source == 'fleaMarket') continue;
+                                    let traderPrice = offer.price * currencies[offer.currency];
+                                    if (traderPrice < itemCost || itemCost == 0) itemCost = traderPrice;
+                                }
+                                craftCost += itemCost * req.count;
                             }
                             craftCost = Math.round(craftCost / c.rewardItems[0].count).toLocaleString() + "₽";
                             if (c.rewardItems[0].count > 1) craftCost += ' (' + c.rewardItems[0].count + ')';
@@ -294,8 +339,16 @@ const barterSearch = (message) => {
             }
             for (const ri in barter.requiredItems) {
                 const req = barter.requiredItems[ri];
-                totalCost += req.item.avg24hPrice * req.count;
-                embed.addField(req.item.name, req.item.avg24hPrice.toLocaleString() + "₽ x " + req.count, true);
+                let itemCost = req.item.avg24hPrice;
+                if (req.item.lastLowPrice > itemCost && req.item.lastLowPrice > 0) itemCost = req.item.lastLowPrice;
+                for (const offerindex in req.item.buyFor) {
+                    const offer = req.item.buyFor[offerindex];
+                    if (offer.source == 'fleaMarket') continue;
+                    let traderPrice = offer.price * currencies[offer.currency];
+                    if (traderPrice < itemCost || itemCost == 0) itemCost = traderPrice;
+                }
+                totalCost += itemCost * req.count;
+                embed.addField(req.item.name, itemCost.toLocaleString() + "₽ x " + req.count, true);
             }
             embed.addField("Total", totalCost.toLocaleString() + "₽", true);
             message.channel.send(embed)
@@ -357,8 +410,18 @@ const craftSearch = (message) => {
             }
             for (const ri in craft.requiredItems) {
                 const req = craft.requiredItems[ri];
-                totalCost += req.item.avg24hPrice * req.count;
-                embed.addField(req.item.name, req.item.avg24hPrice.toLocaleString() + "₽ x " + req.count, true);
+                let itemCost = req.item.avg24hPrice;
+                if (req.item.lastLowPrice > itemCost && req.item.lastLowPrice > 0) itemCost = req.item.lastLowPrice;
+                for (const offerindex in req.item.buyFor) {
+                    const offer = req.item.buyFor[offerindex];
+                    if (offer.source == 'fleaMarket') continue;
+                    let traderPrice = offer.price * currencies[offer.currency];
+                    if (traderPrice < itemCost || itemCost == 0) itemCost = traderPrice;
+                }
+
+                totalCost += itemCost * req.count;
+                //totalCost += req.item.avg24hPrice * req.count;
+                embed.addField(req.item.name, itemCost.toLocaleString() + "₽ x " + req.count, true);
             }
             embed.addField("Total", totalCost.toLocaleString() + "₽", true);
             message.channel.send(embed)
@@ -393,13 +456,20 @@ const craftSearch = (message) => {
 };
 
 const getCraftsBarters = async () => {
-    const craftsQuery = 'query { crafts { source duration requiredItems { item { id name avg24hPrice } count } rewardItems { item { id name iconLink link } count } } }';
-    const bartersQuery = 'query { barters { source requiredItems { item { id name avg24hPrice } count } rewardItems { item { id name iconLink link } count } } }';
+    const craftsQuery = 'query { crafts { source duration requiredItems { item { id name avg24hPrice lastLowPrice buyFor { source price currency requirements { type value } } } count } rewardItems { item { id name iconLink link } count } } }';
+    const bartersQuery = 'query { barters { source requiredItems { item { id name avg24hPrice lastLowPrice buyFor { source price currency requirements { type value } } } count } rewardItems { item { id name iconLink link } count } } }';
     const responses = await Promise.all([ttRequest({ graphql: craftsQuery }), ttRequest({ graphql: bartersQuery })]).catch(error => {
         console.error(`Barters query error: ${error.message}`);
     });
     crafts = responses[0].data.crafts;
     barters = responses[1].data.barters;
+};
+const getCurrencies = async () => {
+    const dollarsQuery = 'query { item(id: "5696686a4bdc2da3298b456a") { buyFor { source price currency requirements { type value } } } }';
+    const eurosQuery = 'query { item(id: "569668774bdc2da2298b4568") { buyFor { source price currency requirements { type value } } } }';
+    const responses = await Promise.all([ttRequest({ graphql: dollarsQuery }), ttRequest({ graphql: eurosQuery })]);
+    currencies['USD'] = responses[0].data.item.buyFor[0].price;
+    currencies['EUR'] = responses[1].data.item.buyFor[0].price;
 };
 const ttRequest = async (options) => {
     return new Promise((resolve, reject) => {
